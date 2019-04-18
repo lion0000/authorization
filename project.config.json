@@ -1,0 +1,15 @@
+{
+	"description": "wepy-skm",
+	"setting": {
+		"urlCheck": true,
+		"es6": false,
+		"postcss": false,
+		"minified": false,
+		"newFeature": true
+	},
+	"compileType": "miniprogram",
+	"appid": "wx652c3d7593c19d30",
+	"projectname": "wepy-skm",
+	"miniprogramRoot": "dist/",
+	"condition": {}
+}

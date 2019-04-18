@@ -1,0 +1,632 @@
+<style lang="less">
+    .container{
+      display: flex;
+      flex-flow: column;
+      .map-container{
+        flex: 1;
+        width: 100%;
+        display: flex;
+        flex-flow: row;
+        .map-wrapper{
+          flex: 1;
+          display: flex;
+          flex-flow: column;
+          map{
+            width: 100%;
+            flex: 1;
+            .cover-refresh{
+              position:absolute;
+              right:0px;
+              height:120rpx;
+              width:120rpx;
+              .cover-icon{
+                height: 120rpx;
+                width: 120rpx;
+              }
+            }
+          }  
+        }
+        .terminal-list-container{
+           width: 60%;
+           overflow-y: auto;
+           background-color: #FFF;
+           .device-title{
+              background-color:#467eec;
+              height:64rpx;
+              color:#FFFFFF;
+              font-size:32rpx;
+              line-height:64rpx;
+              padding-left:30rpx;
+           }
+           .device-row-data{
+                height:62rpx;
+                text{
+                  font-size:38rpx;
+                  color:#467eec;
+                  padding:20rpx;
+                }
+                .switch-container{
+                  float: right;
+                  margin-right: 20rpx;
+                  margin-top:8rpx;
+                  .van-icon{
+                    color: #FFF
+                  }
+                }
+                .Online{
+                  color: #00c79e
+                }
+                .Offline{
+                  color: #a3a3a3
+                }
+           }
+        }
+      }
+      .opera-container{
+        width: 100%;
+        display: block;
+        background-color: #FFF;
+        .opera-button-group{
+            padding: 5px;            
+            .opera-button{
+                background-color: #0079f3;
+                color: #FFF;
+                text-align: center;
+            }
+        }
+      }
+      .opera-view{
+        width: 100%;
+        background-color: #FFF;
+        padding-bottom: 10rpx;
+        .van-row{
+          margin: 0 !important;
+          padding: 0 10rpx !important;
+        }
+        .van-col{
+          padding-left: 10rpx !important;
+          padding-right: 10rpx !important;
+        }
+        .opera-card-group{
+           .opera-col{
+              text-align: center;
+              .opera-card{
+                height: 230rpx;
+                box-shadow: #ececec 0px 0px 15px;
+                border-radius: 1em;
+                text-align: left;
+                border: 1px solid transparent;
+                .card-num{
+                   padding-left: 30rpx;
+                   color: #444444;
+                   font-size: 35rpx;
+                }
+                .card-text{
+                   padding-left: 30rpx;
+                   font-size: 20rpx;
+                   color: #666666;
+                }
+                .icon{
+                  height: 50rpx;
+                  width: 50rpx;
+                }
+                .loading{
+                  height: 36rpx;
+                  width: 36rpx;
+                }
+                .card-icon{
+                  padding: 30rpx;
+                  font-size: 45rpx;
+                  text-align: left;
+                }
+                .icon-terminal{
+                  float: right;
+                  font-size: 45rpx;
+                  margin-right: 15rpx;
+                  height: 40rpx;
+                }
+              }           
+           }
+        }
+      }
+    }
+</style>
+<template>
+    <view class="container">
+        <view class="map-container">
+          <view class="map-wrapper">
+              <map class="map" id="map" longitude="{{longitude}}" latitude="{{latitude}}" bindtap="tapMap" scale="{{scale}}"  bindregionchange="regionChange" polyline="{{polyline}}" markers="{{markers}}">
+                <cover-view wx:if="{{!showTerminal}}" class="cover-refresh" bindtap="pullData">
+                  <cover-image class="cover-icon" src="../images/refresh.png" />
+                </cover-view>
+              </map>
+          </view>            
+          <view wx:if="{{showTerminal}}"  class="terminal-list-container">
+              <view class="device-title">筛选设备轨迹</view>
+              <view class="device-row-data" wx:for="{{deviceArray}}" wx:key="index" wx:for-index="index" wx:for-item="item" bindtap="deviceChecked({{index}})">
+                  <text class="{{item.OnlineState==0?'Offline':'Online'}}">●</text>{{item.DeviceTag || item.DeviceId}} <view class="switch-container"><van-checkbox value="{{ item.checked }}"></van-checkbox></view>
+              </view>
+          </view>
+        </view>
+        <view class="opera-container">
+            <van-row gutter="30" class="opera-button-group">
+              <van-col span="8" class="opera-button" >
+                  <picker mode="multiSelector" bindchange="areaConfirm" bindcolumnchange="areaChange" value="{{areaValue}}" range="{{areaArray}}" range-key="text" custom-item="全部">
+                    <view class="picker" bindtap="tapPicker">
+                      {{areaValueName}}
+                    </view>
+                  </picker>
+              </van-col>
+              <van-col span="8" class="opera-button">
+                  <picker bindchange="pickOpera" value="{{operaValue}}" range-key="text" range="{{operaColumns}}">
+                      <view class="picker" style="boder-left: 1px solid #e5e5e5;" bindtap="tapPicker">
+                        {{operaValue || '运营商'}}
+                      </view>
+                    </picker>
+              </van-col>
+              <van-col span="8" class="opera-button">{{serverDate}}</van-col>
+            </van-row>     
+        </view>
+        <view class="opera-view">
+            <van-row gutter="30" class="opera-card-group">
+              <van-col span="8" class="opera-col">
+                 <view class="opera-card">
+                    <view class="card-icon"><image src="../images/mileage-icon.png" class="icon"></image></view>
+                    <view><image wx:if="{{loadingMileage}}" src="../images/loading.gif" class="loading card-num"></image><text wx:if="{{!loadingMileage}}" class="card-num">{{mileage}}</text></view>                 
+                    <text class="card-text">测试里程数(Km)</text>
+                 </view>
+              </van-col>
+              <van-col span="8" class="opera-col">
+                <view class="opera-card">
+                  <view class="card-icon"><image src="../images/times-icon.png" class="icon"></image></view>
+                  <view><image wx:if="{{loadingDuration}}" src="../images/loading.gif" class="loading card-num"></image><text wx:if="{{!loadingDuration}}" class="card-num">{{duration}}</text></view>                  
+                  <view><text class="card-text">总测试时长(h)</text></view>  
+                </view>                
+              </van-col>
+              <van-col span="8" class="opera-col">
+                <view class="opera-card" bindtap="showTerminalFn">
+                  <view class="card-icon"><image src="../images/taxi-icon.png" class="icon"></image></view>
+                  <view><image wx:if="{{loadingTerminal}}" src="../images/loading.gif" class="loading card-num"></image><text wx:if="{{!loadingTerminal}}" class="card-num">{{device}}</text></view>    
+                  <view><text class="card-text">终端数</text><image src="../images/terminal-icon.png" wx:if="{{device>0}}" class="icon-terminal icon"></image></view>    
+                </view>
+              </van-col>
+            </van-row>    
+        </view>
+    </view>
+</template>
+<script>
+import wepy from 'wepy'
+import moment from '../utils/moment.min.js'
+import api from '../api/api.js'
+import {wxRequest} from '../utils/wxRequest.js'
+import QQMapWX from '../libs/qqmap-wx-jssdk.min.js'
+export default class Home extends wepy.page {
+  config = {
+    usingComponents: {
+      'van-row': '../components/vant/row/index',
+      'van-col': '../components/vant/col/index',
+      'van-checkbox': '../components/vant/checkbox/index'
+    }
+  }
+  data = {
+    markers: [],
+    polyline: [],
+    mileage: 0,
+    duration: 0,
+    device: 0,
+    areaStatic: [],
+    areaArray: [[{text: '中国', id: 1}], [], [{text: '全部', id: 0}]],
+    areaValue: [0, 0, 0],
+    areaValueName: '中国',
+    areaId: 0,
+    areaType: 0,
+    operaColumns: [{value: '', text: '运营商'}, {value: '2001', text: '中国移动'}, {value: '2002', text: '中国联通'}, {value: '2003', text: '中国电信'}],
+    operaValue: null,
+    operaId: '',
+    latitude: '',
+    longitude: '',
+    scale: 4,
+    scale_copy: 4,
+    mapType: 1,
+    showTerminal: false,
+    deviceArray: [],
+    deviceCheckedArray: [],
+    loadingMileage: false,
+    loadingDuration: false,
+    loadingTerminal: false
+  }
+  computed = {
+    serverDate: function() {
+      return moment(new Date(new Date().getTime())).format('YYYY-MM-DD')
+    }
+  }
+  methods = {
+    areaChange(e) {
+      if (e.detail.column === 1) {
+        this.areaArray[2] = this.areaArray[1][e.detail.value].children
+        this.$apply()
+      }
+    },
+    async areaConfirm(e) {
+      const valueArea = e.detail.value
+      if (valueArea[1] === 0) {
+        this.areaValueName = '中国'
+        this.areaId = 0
+        this.areaType = 0
+        this.scale = 5
+        this.latitude = 33.56051741848503
+        this.longitude = 111.30779874999999
+        this.deviceArray = []
+      } else {
+        let areaName
+        let location
+        let scale
+        let id
+        let type
+        if (valueArea[2] === 0) {
+          areaName = this.areaArray[1][valueArea[1]].text
+          location = this.areaArray[1][valueArea[1]].location
+          id = this.areaArray[1][valueArea[1]].id
+          scale = 8
+          type = 1
+        } else {
+          areaName = this.areaArray[1][valueArea[1]].children[valueArea[2]].text
+          location = this.areaArray[1][valueArea[1]].children[valueArea[2]].location
+          id = this.areaArray[1][valueArea[1]].children[valueArea[2]].id
+          scale = 11
+          type = 2
+        }
+        this.latitude = location.lat
+        this.longitude = location.lng
+        this.areaValueName = areaName
+        this.areaId = id
+        this.areaType = type
+        this.areaValue = e.detail.value
+        this.scale = scale
+        this.deviceArray = []
+        this.deviceCheckedArray = []
+      }
+      this.polyline = []
+      this.$apply()
+      this.queryGIS()
+      this.queryMileage()
+      this.queryDuration()
+      this.queryDeviceCount()
+    },
+    async pickOpera(e) {
+      this.showTerminal = false
+      this.operaValue = this.operaColumns[e.detail.value].text
+      this.operaId = this.operaColumns[e.detail.value].value
+      this.deviceArray = []
+      this.deviceCheckedArray = []
+      this.polyline = []
+      this.$apply()
+      this.queryGIS()
+      this.queryMileage()
+      this.queryDuration()
+      this.queryDeviceCount()
+    },
+    async showTerminalFn() {
+      if (this.device === 0) {
+        return
+      }
+      if (this.deviceArray.length === 0 && !this.showTerminal) {
+        await this.queryDevice()
+      }
+      this.showTerminal = true
+      this.$apply()
+    },
+    tapMap() {
+      this.showTerminal = false
+      this.$apply()
+    },
+    tapPicker() {
+      this.showTerminal = false
+    },
+    deviceChecked(index) {
+      this.deviceArray[index].checked = !this.deviceArray[index].checked
+      if (this.deviceArray[index].checked) {
+        this.deviceCheckedArray.push(this.deviceArray[index])
+        this.showTrajectory(this.deviceArray[index])
+      } else {
+        const indexR = this.deviceCheckedArray.indexOf(this.deviceArray[index])
+        this.deviceCheckedArray.splice(indexR, 1)
+        this.updateTrajectory(this.deviceArray[index].DeviceId)
+      }
+      /** 根据最后一个坐标系定位 **/
+      if (this.deviceCheckedArray.length > 0) {
+        this.latitude = this.deviceCheckedArray[this.deviceCheckedArray.length - 1].Latitude
+        this.longitude = this.deviceCheckedArray[this.deviceCheckedArray.length - 1].Longitude
+        this.scale = 16
+      }
+      this.$apply()
+    },
+    async regionChange(e) {
+      if (e.type === 'end') {
+        const that = this
+        const scaleOld = this.scale_copy
+        const scaleNew = await this.getScale()
+        // "drag" 拖动 "scale" 缩放
+        if (e.causedBy === 'scale') {
+          clearTimeout(this.timeSet)
+          if (scaleNew - scaleOld > 0) { /** 地图放大 **/
+            this.timeSet = setTimeout(function() {
+              that.pullData(scaleNew)
+            }, 2500)
+          } else if (scaleNew - scaleOld < 0) { /** 地图缩小 **/
+            this.timeSet = setTimeout(function() {
+              that.pullData(scaleNew)
+            }, 2500)
+          }
+        }
+        this.scale_copy = scaleNew
+      }
+    }
+  }
+  async pullData(level) {
+    /** 点击刷新按钮 **/
+    if (level.type && level.type === 'tap') {
+      this.showTerminal = false
+      this.queryDeviceCount()
+      this.queryMileage()
+      this.queryDuration()
+      this.queryGIS()
+    } else if (typeof level === 'number') { /** 地图缩放触发 **/
+      level = await this.getScale()
+      const regionChange = await this.setRegionInfo(level)
+      if (regionChange) {
+        this.queryDeviceCount()
+        this.queryMileage()
+        this.queryDuration()
+        if (level > 11 && this.polyline.length > 0) {
+            // somethings
+        } else {
+          this.queryGIS()
+        }
+      }
+    }
+  }
+  /** 根据坐标获取地区信息 **/
+  async setRegionInfo(level) {
+    const that = this
+    return new Promise((resolve, reject) => {
+      this.mpCtx.getCenterLocation({
+        success: function(e) {
+          that.qqmapsdk.reverseGeocoder({
+            location: {
+              latitude: e.latitude,
+              longitude: e.longitude
+            },
+            success: function(res) {
+              const addressData = res.result.address_component
+              let isChange = false
+              if (level < 7) {
+                if (that.areaId !== 0) {
+                  that.areaValueName = '中国'
+                  that.areaId = 0
+                  that.areaType = 0
+                  isChange = true
+                }
+              }
+              if (level >= 7 && level < 11) {
+                let provinceRow = that.areaStatic.filter(function(currentValue, index, arr) {
+                  if (addressData.province.indexOf(currentValue.text) === 0) {
+                    return currentValue
+                  }
+                })
+                provinceRow = provinceRow[0]
+                if (provinceRow.id !== that.areaId) {
+                  that.latitude = e.latitude
+                  that.longitude = e.longitude
+                  that.$apply()
+                  that.areaId = provinceRow.id
+                  that.areaValueName = provinceRow.text
+                  that.areaType = 1
+                  that.areaArray[2] = provinceRow.children
+                  isChange = true
+                }
+              } else if (level >= 11) {
+                let provinceRow = that.areaStatic.filter(function(currentValue, index, arr) {
+                  if (addressData.province.indexOf(currentValue.text) === 0) {
+                    return currentValue
+                  }
+                })
+                provinceRow = provinceRow[0]
+                let cityRow = provinceRow.children.filter(function(currentValue, index, arr) {
+                  if (addressData.city.indexOf(currentValue.text) === 0) {
+                    return currentValue
+                  }
+                })
+                cityRow = cityRow[0]
+                if (cityRow.id !== that.areaId) {
+                  that.latitude = e.latitude
+                  that.longitude = e.longitude
+                  that.$apply()
+                  that.areaId = cityRow.id
+                  that.areaValueName = cityRow.text
+                  that.areaType = 2
+                  isChange = true
+                }
+              }
+              that.$apply()
+              resolve(isChange)
+            }
+          })
+        }
+      })
+    })
+  }
+  /** 地区查询 **/
+  async queryArea() {
+    let res = await wxRequest({}, api.HomeArea)
+    if (res.data.State === 0) {
+      this.areaStatic = res.data.Data.china
+      this.areaArray[1] = res.data.Data.china
+    }
+  }
+  /** 首页地图数据查询 **/
+  async queryGIS() {
+    const query = {
+      AreaId: this.areaId,
+      AreaType: this.areaType,
+      OperatorId: this.operaId
+    }
+    const areaType = this.areaType
+    let res = await wxRequest({query}, api.HomeIndex)
+    if (res.data.State === 0) {
+      const resData = res.data.Data
+      let gisData = []
+      this.deviceArray = []
+      this.deviceCheckedArray = []
+      this.polyline = []
+      resData.map(function(data, index, array) {
+        let rowData
+        let label = {content: '' + '', borderWidth: 2, borderRadius: 5, bgColor: '#FFF', borderColor: '#FFF', padding: 4, anchorX: 15, anchorY: -30}
+        if (areaType !== 2) {
+          label.content = data.Count + ''
+          const iconPath = '../images/taxi.png'
+          rowData = {
+            latitude: data.Location.Lat,
+            longitude: data.Location.Lng
+          }
+          rowData.label = label
+          rowData.iconPath = iconPath
+        } else {
+          label.content = data.DeviceTag ? data.DeviceTag : data.DeviceId + ''
+          rowData = {
+            label,
+            latitude: data.Latitude,
+            longitude: data.Longitude
+          }
+          if (data.OnlineState) {
+            rowData.iconPath = '../images/Online.png'
+          } else {
+            rowData.iconPath = '../images/Offline.png'
+          }
+        }
+        gisData.push(rowData)
+      })
+      this.markers = gisData
+      this.$apply()
+    }
+  }
+  /** 设备查询 **/
+  async queryDevice() {
+    const query = {
+      AreaId: this.areaId,
+      AreaType: this.areaType,
+      OperatorId: this.operaId
+    }
+    let res = await wxRequest({query}, api.HomeDevice, true)
+    if (res.data.State === 0) {
+      this.deviceArray = res.data.Data
+      this.$apply()
+    }
+  }
+  /** 查询实时测试里程 **/
+  async queryMileage() {
+    this.loadingMileage = true
+    const query = {
+      AreaId: this.areaId,
+      AreaType: this.areaType,
+      OperatorId: this.operaId
+    }
+    let res = await wxRequest({query}, api.HomeMileage)
+    this.mileage = res.data.Data
+    this.loadingMileage = false
+    this.$apply()
+  }
+  /** 查询实时测试时长 **/
+  async queryDuration() {
+    this.loadingDuration = true
+    const query = {
+      AreaId: this.areaId,
+      AreaType: this.areaType,
+      OperatorId: this.operaId
+    }
+    let res = await wxRequest({query}, api.HomeDuration)
+    this.duration = res.data.Data
+    this.loadingDuration = false
+    this.$apply()
+  }
+  /** 查询实时测试设备数 **/
+  async queryDeviceCount() {
+    this.loadingTerminal = true
+    const query = {
+      AreaId: this.areaId,
+      AreaType: this.areaType,
+      OperatorId: this.operaId
+    }
+    let res = await wxRequest({query}, api.HomeDeviceCount)
+    this.device = res.data.Data
+    this.loadingTerminal = false
+    this.$apply()
+  }
+  /** 获取地图可视区域 **/
+  getRegion() {
+    return new Promise((resolve, reject) => {
+      let region = {}
+      this.mpCtx.getRegion({
+        success: function(e) {
+          region.northeast = e.northeast
+          region.southwest = e.southwest
+          resolve(region)
+        }
+      })
+    })
+  }
+  /** 获取地图层级 **/
+  getScale() {
+    return new Promise((resolve, reject) => {
+      this.mpCtx.getScale({
+        success: function(e) {
+          resolve(parseInt(e.scale))
+        }
+      })
+    })
+  }
+  onShow() {
+    this.mpCtx = wepy.createMapContext('map', this)
+  }
+  async showTrajectory(deviceData) {
+    const query = {
+      deviceId: deviceData.DeviceId
+    }
+    let res = await wxRequest({query}, api.HomeDeviceTrajectory)
+    const deviceMapData = res.data.Data
+    for (let i = 0; i < deviceMapData.length; i++) {
+      this.polyline.push({
+        points: deviceMapData[i],
+        width: 4,
+        deviceId: deviceData.DeviceId,
+        color: deviceData.Color
+      })
+    }
+
+    this.markers = []
+    this.$apply()
+  }
+  updateTrajectory(deviceId) {
+    for (let i = 0; i < this.polyline.length; i++) {
+      const row = this.polyline[i]
+      if (row.deviceId === deviceId) {
+        this.polyline.splice(i, 1)
+        this.$apply()
+        break
+      }
+    }
+  }
+  onLoad() {
+    this.qqmapsdk = new QQMapWX({key: 'VCEBZ-M4NC5-NN7IM-QTZTQ-ECK7J-DHFI7'})
+     /** 设置地图中心点 **/
+    this.latitude = 33.56051741848503
+    this.longitude = 111.30779874999999
+    this.$apply()
+    this.queryArea()
+    this.queryGIS()
+    this.queryMileage()
+    this.queryDuration()
+    this.queryDeviceCount()
+  }
+}
+</script>
